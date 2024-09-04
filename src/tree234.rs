@@ -1,9 +1,44 @@
 use std::{fmt::Debug, ptr};
 
+/**
+ * A tree struct which implements 2-3-4 tree.
+ * 
+ * # The benefits of 2-3-4 tree
+ * - The height of the tree is always O(log n).
+ * - The tree is always balanced.
+ * - The tree is always full.
+ * - The tree is always sorted.
+ * - Search, insert, and delete operations are O(log n).
+ * 
+ * # Example
+ * ```
+ * use algorithm::Tree234;
+ * let mut tree = Tree234::new();
+ * tree.insert(1);
+ * tree.insert(2);
+ * tree.insert(3);
+ * assert(tree.find(&1));
+ * assert(tree.find(&2));
+ * assert(!tree.find(&4));
+ * tree.delete(&2);
+ * assert(!tree.find(&2));
+ * ```
+ * 
+ */
 #[derive(Debug, Clone)]
 pub struct Tree234<T> {
+    /**
+     * array which contains node's data.
+     */
     pub(crate) data: [Option<T>; 4],
+    /**
+     * array which contains node's children.
+     */
     pub(crate) children: [Option<Box<Tree234<T>>>; 4],
+    /**
+     * size of node.
+     * 0 <= size <= 3
+     */
     pub(crate) size: usize,
 }
 
@@ -32,6 +67,14 @@ impl<T: PartialEq> PartialEq for Tree234<T> {
 impl<T: Eq> Eq for Tree234<T> {}
 
 impl<T: Ord + Debug> From<Vec<T>> for Tree234<T> {
+    /**
+     * a method to make a Tree234 from a Vec.
+     * ```
+     * use algorithm::Tree234;
+     * let tree = Tree234::from(vec![1, 2, 3]);
+     * assert(tree.find(&1));
+     * ```
+     */
     fn from(v: Vec<T>) -> Self {
         let mut tree = Tree234::new();
         for i in v {
@@ -50,42 +93,53 @@ impl<T> Tree234<T> {
         }
     }
 
+    /**
+     * clear the tree.
+     */
     pub fn clear(&mut self) {
         self.data = [None, None, None, None];
         self.children = [None, None, None, None];
         self.size = 0;
     }
 
+    /**
+     * check if the tree is empty.
+     */
     pub fn is_empty(&self) -> bool {
         self.size == 0
     }
 }
 
-impl<T: Ord + Debug> Tree234<T> {
-    pub fn contains(&self, value: &T) -> bool {
-        if self.size == 0 {
-            return false;
-        }
-        for i in 0..self.size {
-            if value == self.data[i].as_ref().unwrap() {
-                return true;
-            }
-            if value > self.data[i].as_ref().unwrap() {
-                return self.children[i].as_ref().unwrap().contains(value);
-            }
-        }
-        return false;
-    }
+impl<T: Ord> Tree234<T> {
 
+    /**
+     * append all value in values to self.
+     * ```rust
+     * use algorithm::Tree234;
+     * let mut tree = Tree234::new();
+     * tree.append(vec![1, 2, 3]);
+     * assert(tree.find(&1));
+     * assert(tree.find(&2));
+     * assert(tree.find(&3));
+     * ```
+     */
     pub fn append(&mut self, values: Vec<T>) {
         for i in values {
             self.insert(i);
         }
     }
-
+    /**
+     * insert value to self
+     * ```rust
+     * use algorithm::Tree234;
+     * let mut tree = Tree234::new();
+     * tree.insert(1);
+     * tree.insert(2);
+     * ```
+     */
     pub fn insert(&mut self, value: T) {
         if self.size == 3 {
-            // 自分がrootかつsizeが3の場合 if以下はすべてinsertが呼び出される前に分割されるのでここには入らない.
+            // 自分がrootかつsizeが3の場合のみ if以下はすべてinsertが呼び出される前に分割されるのでここには入らない.
             let mid = self.data[1].take();
             let left = Box::new(Self {
                 data: [self.data[0].take(), None, None, None],
@@ -101,12 +155,14 @@ impl<T: Ord + Debug> Tree234<T> {
             self.children = [Some(left), Some(right), None, None];
             self.size = 1;
         }
+
         let mut pos = self.find_index(&value);
         if self.is_leaf() {
             insert_to_array(&mut self.data, pos, Some(value));
             self.size += 1;
             return;
         }
+
         if self.children[pos].as_ref().unwrap().size == 3 {
             let mut child = delete_from_array(&mut self.children, pos).unwrap();
             let mid = child.data[1].take();
@@ -139,7 +195,16 @@ impl<T: Ord + Debug> Tree234<T> {
         }
         self.children[pos].as_mut().unwrap().insert(value);
     }
-
+    /**
+     * if value is in self, delete it and return true. else return false
+     * ```rust
+     * use algorithm::Tree234;
+     * let mut tree = Tree234::new();
+     * tree.insert(1);
+     * assert(tree.delete(&1));
+     * assert(!tree.delete(&1));
+     * ```
+     */
     pub fn delete(&mut self, value: &T) -> bool {
         if self.is_leaf() {
             let pos = self.find_index(value);
@@ -157,7 +222,7 @@ impl<T: Ord + Debug> Tree234<T> {
             // 子ノードの大きさが2以上の場合, それを起点に再帰的に削除を行う.
             return self.children[pos].as_mut().unwrap().delete(value);
         }
-        if !is_internal {
+        if !is_internal { // internalでないかつ子ノードの大きさが1の場合
             self.delete_balance(pos);
             return self.delete(value);
         }
@@ -183,6 +248,9 @@ impl<T: Ord + Debug> Tree234<T> {
         self.delete(value)
     }
 
+    /**
+     * make the node balanced for deletion.
+     */
     fn delete_balance(&mut self, pos: usize) {
         // 隣接兄弟ノードの大きさが2以上の場合, 回転を行う
         if (pos > 0 && self.children[pos - 1].as_ref().unwrap().size > 1)
@@ -199,7 +267,14 @@ impl<T: Ord + Debug> Tree234<T> {
     }
 
     /**
-     * 値を探す.
+     * check if the tree contains value.
+     * ```rust
+     * use algorithm::Tree234;
+     * let mut tree = Tree234::new();
+     * tree.insert(1);
+     * assert(tree.find(&1));
+     * assert(!tree.find(&2));
+     * ```
      */
     pub fn find(&self, value: &T) -> bool {
         let pos = self.find_index(value);
@@ -212,6 +287,10 @@ impl<T: Ord + Debug> Tree234<T> {
         return self.children[pos].as_ref().unwrap().find(value);
     }
 
+    /**
+     * make self.children[pos] contains more than 1 element.
+     * this should only be called when one of its sibling has more than 1 element.
+     */
     fn rotate(&mut self, pos: usize) {
         if pos > 0 && self.children[pos - 1].as_ref().unwrap().size > 1 {
             // 左の兄弟から値を持ってくる
@@ -266,6 +345,10 @@ impl<T: Ord + Debug> Tree234<T> {
         };
     }
 
+    /**
+     * make self.children[pos] contains more than 1 element.
+     * this should only be called when self.size > 1 and all of its sibling has only 1 element.
+     */
     fn merge(&mut self, pos: usize) {
         // 兄弟要素の値と親要素のいい感じの値を自分のdataとし, 兄弟要素の子要素を自分の子要素とする.
         self.size -= 1;
@@ -313,19 +396,27 @@ impl<T: Ord + Debug> Tree234<T> {
         }
     }
 
+    /**
+     * make self.size == 1 and all of its sibling has only 1 element.
+     * this should only be called when self.size == 1 and all of its sibling has only 1 element.
+     */
     fn shrink(&mut self) {
         // self.data = [left.data, self.data, right.data, None];
-        // self.children = [*left.children, *right.children, None, None];
+        // self.children = [*left.children, *right.children];
         self.size = 3;
         insert_to_array(&mut self.data, 0, self.children[0].as_mut().unwrap().data[0].take());
         self.data[2] = self.children[1].as_mut().unwrap().data[0].take();
         assert!(self.children[1].as_mut().unwrap().children[0].is_some());
-        self.children[2] = self.children[1].as_mut().unwrap().children[0].take();
         self.children[3] = self.children[1].as_mut().unwrap().children[1].take();
+        self.children[2] = self.children[1].as_mut().unwrap().children[0].take();
         self.children[1] = self.children[0].as_mut().unwrap().children[1].take();
         self.children[0] = self.children[0].as_mut().unwrap().children[0].take();
     }
 
+    /**
+     * find the index of self's child which may contains value
+     * if value is in self.data, return the index of self.data
+     */
     fn find_index(&self, value: &T) -> usize {
         // 挿入する場合, どの位置に挿入するべきかを返す.
         for i in 0..self.size {
@@ -339,7 +430,10 @@ impl<T: Ord + Debug> Tree234<T> {
 
 impl<T: Ord + Clone> Tree234<T> {
     /**
-     * 指定した値を探し, (その値以下のもののうち一番大きい値, その値以上のもののうち一番小さい値)
+     * search the value and return (lower_bound, upper_bound)
+     * lower_bound <= value <= upper_bound
+     * if lower_bound is None, value is smaller than all of the values in the tree.
+     * if upper_bound is None, value is larger than all of the values in the tree.
      */
     pub fn search_and_get_range(&self, value: &T) -> (Option<&T>, Option<&T>) {
         if self.is_empty() {
@@ -384,11 +478,17 @@ impl<T: Ord + Clone> Tree234<T> {
 }
 
 impl<T> Tree234<T> {
+    /**
+     * check if self is a leaf node.
+     */
     pub(crate) fn is_leaf(&self) -> bool {
         self.children[0].is_none()
     }
 }
 
+/**
+ * Insert value to array[index], shifting the rest of the array to the right.
+ */
 fn insert_to_array<S>(array: &mut [S], index: usize, value: S) {
     #[cold]
     #[cfg_attr(not(feature = "panic_immediate_abort"), inline(never))]
@@ -415,6 +515,9 @@ fn insert_to_array<S>(array: &mut [S], index: usize, value: S) {
     }
 }
 
+/**
+ * remove array[index], shifting the rest of the array to the left.
+ */
 fn delete_from_array<S>(array: &mut [S], index: usize) -> S {
     #[cold]
     #[cfg_attr(not(feature = "panic_immediate_abort"), inline(never))]

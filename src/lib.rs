@@ -7,3 +7,5 @@ pub use bit_search::*;
 mod tree234;
 pub use tree234::*;
 mod tests;
+mod rbtree;
+pub use rbtree::*;
